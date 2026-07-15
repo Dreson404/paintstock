@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1f6f54" />
+  <meta name="description" content="Track leftover paint stock by brand, type and colour. Look up what you have before pricing a job. Works offline, no account needed." />
+  <title>Paint Stock</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-bar">
+    <div class="app-bar__title">
+      <span class="app-bar__logo" aria-hidden="true">🪣</span>
+      <h1>Paint Stock</h1>
+    </div>
+    <button id="btn-add" class="btn btn--primary" type="button">+ Add</button>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab tab--active" data-tab="stock" role="tab" type="button">Stock</button>
+    <button class="tab" data-tab="calc" role="tab" type="button">Job calc</button>
+    <button class="tab" data-tab="data" role="tab" type="button">Backup</button>
+  </nav>
+
+  <!-- STOCK TAB -->
+  <main id="tab-stock" class="tab-panel tab-panel--active">
+    <div class="search">
+      <input id="search" type="search" inputmode="search" placeholder="Search colour, type or brand…" autocomplete="off" />
+    </div>
+
+    <div class="filters">
+      <select id="filter-brand" aria-label="Filter by brand">
+        <option value="">All brands</option>
+      </select>
+      <select id="filter-sort" aria-label="Sort by">
+        <option value="updated">Last updated</option>
+        <option value="brand">Brand A–Z</option>
+        <option value="quantity">Most litres</option>
+        <option value="color">Colour A–Z</option>
+      </select>
+    </div>
+
+    <div id="stats" class="stats"></div>
+
+    <ul id="list" class="list" aria-live="polite"></ul>
+    <p id="empty" class="empty" hidden>No paint yet. Tap <strong>+ Add</strong> to log your first tin.</p>
+  </main>
+
+  <!-- CALC TAB -->
+  <main id="tab-calc" class="tab-panel" hidden>
+    <section class="card">
+      <h2>Job coverage estimator</h2>
+      <p class="muted">Rough guide: 1 litre ≈ 10 m² per coat. Tells you if matching stock covers the job.</p>
+      <label>Area to paint (m²)
+        <input id="calc-area" type="number" inputmode="decimal" min="0" step="1" placeholder="e.g. 60" />
+      </label>
+      <label>Coats
+        <input id="calc-coats" type="number" inputmode="numeric" min="1" step="1" value="2" />
+      </label>
+      <label>Match colour name / code
+        <input id="calc-color" type="search" placeholder="leave blank to check all stock" autocomplete="off" />
+      </label>
+      <div id="calc-result" class="calc-result"></div>
+    </section>
+  </main>
+
+  <!-- DATA TAB -->
+  <main id="tab-data" class="tab-panel" hidden>
+    <section class="card">
+      <h2>Backup &amp; restore</h2>
+      <p class="muted">Your stock lives only on this device. Export a file to keep a backup or move it to another phone.</p>
+      <div class="row">
+        <button id="btn-export-json" class="btn" type="button">Export JSON</button>
+        <button id="btn-export-csv" class="btn" type="button">Export CSV</button>
+      </div>
+      <div class="row">
+        <label class="btn btn--file">Import JSON
+          <input id="btn-import" type="file" accept="application/json,.json" hidden />
+        </label>
+        <button id="btn-clear" class="btn btn--danger" type="button">Delete all</button>
+      </div>
+      <p id="data-msg" class="muted" role="status"></p>
+    </section>
+  </main>
+
+  <!-- EDIT MODAL -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <form id="form" class="modal__sheet" novalidate>
+      <h2 id="form-title">Add paint</h2>
+
+      <label>Brand
+        <input id="f-brand" list="brand-list" placeholder="Resene, Dulux, Wattyl…" />
+        <datalist id="brand-list"></datalist>
+      </label>
+
+      <label>Type / product (e.g. Interior low-sheen, Primer, Ceiling flat, Enamel)
+        <input id="f-type" placeholder="what kind of paint" />
+      </label>
+
+      <div class="grid-2">
+        <label>Colour name
+          <input id="f-colorName" placeholder="Alabaster" />
+        </label>
+        <label>Colour code
+          <input id="f-colorCode" placeholder="NN40-001" />
+        </label>
+      </div>
+
+      <label>Swatch (optional hex, e.g. #e8e2d0)
+        <input id="f-hex" type="text" placeholder="#e8e2d0" maxlength="7" />
+      </label>
+
+      <label>Finish
+        <select id="f-finish">
+          <option value="">—</option>
+          <option>Flat</option>
+          <option>Low Sheen</option>
+          <option>Matte</option>
+          <option>Satin</option>
+          <option>Semi-gloss</option>
+          <option>Gloss</option>
+          <option>Enamel</option>
+        </select>
+      </label>
+
+      <div class="grid-2">
+        <label>Quantity (litres)
+          <input id="f-quantity" type="number" inputmode="decimal" min="0" step="0.25" placeholder="2.5" />
+        </label>
+        <label>Container (e.g. 4L tin, leftover)
+          <input id="f-container" placeholder="leftover" />
+        </label>
+      </div>
+
+      <label>Notes
+        <textarea id="f-notes" rows="2" placeholder="where it is, condition, etc."></textarea>
+      </label>
+
+      <p id="form-error" class="form-error" role="alert" hidden></p>
+
+      <div class="modal__actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn--primary">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
