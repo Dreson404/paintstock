@@ -1,2 +1,10 @@
 node_modules/
 package-lock.json
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+*.jks
+keystore.jks
+# OS
+.DS_Store

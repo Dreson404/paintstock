@@ -1,85 +1,92 @@
 # Paint Stock 🪣
 
-A free, offline-first Android app (PWA) to track leftover paint tins by
-**brand · type · colour · finish · litres**, and look stock up when pricing a job.
+A **native Android app** to track leftover paint tins and **scan a tin with the camera**
+so AI fills in the brand / type / colour — you only type **how many litres**.
 
-- **No server, no account.** Stock is saved on each device (phone/tablet).
-- **Installs like a native app** via "Add to Home Screen" — full screen, works offline.
-- **Job calculator:** enter wall area (m²) + coats → see if matching stock covers it.
-- **Backup / restore:** export & import JSON or CSV (move stock between phones).
-
-## Files in this folder (these are the whole app)
-```
-index.html        app shell
-styles.css        dark theme
-app.js            all logic (add/search/filter/calc/backup) — stored in localStorage
-manifest.webmanifest  PWA metadata
-sw.js             service worker (offline + install)
-icon-192.png, icon-512.png   app icons
-gen_icons.py      icon generator (optional, you don't need to ship this)
-test_smoke.js     headless test (optional; requires `npm i jsdom`)
-```
-You only need to upload the first **8 files** (everything except `gen_icons.py`,
-`test_smoke.js`, `node_modules/`, `package-lock.json`) to host it.
+- **Native Android** (built with Capacitor — real `.apk`, not a website).
+- **Offline-first, per-device stock.** No server, no account. Your data stays on the phone.
+- **📷 Scan tin:** photo → OpenAI vision (`gpt-4o-mini`) reads brand/type/colour/code/finish/swatch →
+  pre-fills the form → you add litres → Save.
+- **Look up stock** when pricing a job; **job calculator** estimates if you own enough paint.
+- **Backup/restore** via JSON/CSV (move stock between phones).
 
 ---
 
-## 1. Host it for free (this is the "download website")
+## How the AI scan works
+1. Tap **📷 Scan** → camera opens.
+2. Point at the label → **Capture**.
+3. The photo (base64) is sent to OpenAI **vision** with your key. Nothing else leaves the phone.
+4. The form fills in brand, type, colour name/code, finish and a swatch colour.
+   **Only the litres field is left blank** — you type it and hit Save.
+5. No key? You can still add tins manually, and set the key later in ⚙ Settings.
 
-### Option A — Netlify Drop (fastest, ~30 seconds)
-1. Go to **https://app.netlify.com/drop**
-2. Drag the whole `paintstock` folder onto the page.
-3. You get a free HTTPS URL like `https://brave-paint-123.netlify.app`.
-   Open it on your phone → Add to Home Screen → done.
-
-### Option B — GitHub Pages (permanent, your own domain later)
-1. On GitHub, create a new repo (e.g. `paintstock`).
-2. Upload these 8 files to the repo.
-3. Repo **Settings → Pages →** source `main` branch, root folder → Save.
-4. Your app lives at `https://<you>.github.io/paintstock/`.
-
-(Cloudflare Pages "drag & drop" is the same idea as Option A.)
-
-> The PWA install button only works over **HTTPS** — that's why it must be hosted,
-> not opened as a `file://` from a USB stick.
+> Your OpenAI key is stored privately on the device (Android Keystore via Capacitor
+> Preferences, or `localStorage` in the browser). It is **never** hardcoded and is
+> sent **only** to `api.openai.com` when you tap Capture.
 
 ---
 
-## 2. Install on Android (no Play Store needed)
-1. Open the hosted URL in **Chrome**.
-2. Tap the **⋮ menu → "Install app"** (or "Add to Home Screen").
-3. It appears as **Paint Stock** on your home screen — tap to open like any app.
-   Works fully offline after first load.
+## Build the APK (no PC needed — GitHub Actions)
 
-To add it on someone else's phone, just send them the link.
+You don't need Android Studio or Java on your machine. GitHub builds a **signed** APK for free.
+
+### One-time setup
+1. Create a GitHub repo and push this folder.
+2. On a machine **with Java** (or GitHub Codespaces), run:
+   ```bash
+   ./make-keystore.sh
+   ```
+   It prints a long base64 string — that's your keystore.
+3. In the repo: **Settings → Secrets and variables → Actions → New repository secret**, add:
+   - `KEYSTORE_BASE64` = the base64 from step 2
+   - `KEY_ALIAS` = `paintstock`
+   - `KEYSTORE_PASSWORD` = the keystore password you entered
+   - `KEY_PASSWORD` = the key password you entered
+
+### Build
+- Go to **Actions → "Build signed APK" → Run workflow**.
+- When it finishes, download the **paintstock-release-apk** artifact → `app-release.apk`.
+
+### Install on your phone
+- Copy `app-release.apk` to the phone, open it, allow "Install unknown apps", and install.
+- Because it's a **signed release** APK (not from Play Store), Android shows a one-time
+  "unknown source" prompt — that's normal for sideloading.
+
+> To publish on the Play Store instead, use the same keystore and follow Google's
+> "Play App Signing" steps; the workflow already produces a release-ready APK.
 
 ---
 
-## 3. How it's used day-to-day
-- **+ Add** a tin: brand, type, colour name + code, a swatch hex, finish, litres, notes.
-- **Search** any text (colour, type, brand) and filter/sort to find stock fast.
-- **Job calc** tab: enter the area you're quoting → see if you already own enough paint.
-- **Backup** tab: export before wiping the phone; import on a new device.
-
----
-
-## 4. Running locally for development
+## Build locally (optional)
 ```bash
-cd paintstock
-python3 -m http.server 8080   # then open http://localhost:8080
-# run the smoke test (needs jsdom):
-npm i jsdom && node test_smoke.js
+npm install
+npx cap sync android      # copies web/ into the native project
+# then either:
+npx cap open android      # opens Android Studio (needs JDK + Android SDK)
+# or just run the web app for dev:
+python3 -m http.server 8080   # open http://localhost:8080
 ```
 
-## 5. Want a real .apk (for side-loading / Play Store)?
-Wrap it with Apache Cordova or Capacitor in one command:
+### Run the tests
 ```bash
-npm i -g @capacitor/cli
-npx cap init paintstock com.yourname.paintstock
-npx cap add android && npx cap build android
+npm install
+NODE_PATH=./node_modules node test_smoke.js   # 22 checks (mock camera + mock OpenAI)
 ```
-Say the word and I'll generate the full Capacitor project + signed-build steps.
 
 ---
 
-*Made for Dre @ CMN. Stock stays on the device; nothing leaves the phone.*
+## Project layout
+```
+web/                 the app (HTML/CSS/JS) — single source of truth
+  index.html         UI: tabs, scan modal, settings, edit form
+  app.js             all logic: stock, scan->OpenAI, calc, backup
+  styles.css         dark theme
+  manifest.webmanifest / icon-*.png
+scripts/copy-web.js  helper to copy web/ into native assets
+android/             generated native Android project (Capacitor)
+.github/workflows/   builds the signed APK in CI
+make-keystore.sh     one-time signing key generator
+test_smoke.js        headless verification
+```
+
+*Made for Dre @ CMN. Stock stays on the device; the AI key is yours and stays on the device.*
