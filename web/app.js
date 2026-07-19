@@ -20,6 +20,14 @@
   var apiModel = "gpt-4o-mini";
   var Cap = (typeof window !== "undefined" && window.Capacitor) ? window.Capacitor : null;
   var isNative = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+  // Capacitor v6 exposes plugins at Capacitor.Plugins.<Name>, NOT window.<Name>.
+  // (window.Camera / window.Preferences are undefined with a plain, non-bundled app.js,
+  //  which silently forced the browser fallback so the real camera never opened.)
+  function plugin(name) {
+    if (Cap && Cap.Plugins && Cap.Plugins[name]) return Cap.Plugins[name];
+    if (typeof window !== "undefined" && window[name]) return window[name]; // legacy fallback
+    return null;
+  }
 
   /* ---------- storage ---------- */
   function load() {
@@ -34,10 +42,11 @@
   /* ---------- settings (API key) ---------- */
   async function loadKey() {
     try {
-      if (isNative && window.Preferences) {
-        const k = await window.Preferences.get({ key: KEY_KEY });
+      var Preferences = plugin("Preferences");
+      if (isNative && Preferences) {
+        const k = await Preferences.get({ key: KEY_KEY });
         if (k && k.value) apiKey = k.value;
-        const m = await window.Preferences.get({ key: MODEL_KEY });
+        const m = await Preferences.get({ key: MODEL_KEY });
         if (m && m.value) apiModel = m.value;
       } else {
         apiKey = localStorage.getItem(KEY_KEY) || "";
@@ -47,9 +56,10 @@
   }
   async function persistKey() {
     try {
-      if (isNative && window.Preferences) {
-        await window.Preferences.set({ key: KEY_KEY, value: apiKey });
-        await window.Preferences.set({ key: MODEL_KEY, value: apiModel });
+      var Preferences = plugin("Preferences");
+      if (isNative && Preferences) {
+        await Preferences.set({ key: KEY_KEY, value: apiKey });
+        await Preferences.set({ key: MODEL_KEY, value: apiModel });
       } else {
         if (apiKey) localStorage.setItem(KEY_KEY, apiKey); else localStorage.removeItem(KEY_KEY);
         localStorage.setItem(MODEL_KEY, apiModel);
@@ -266,10 +276,11 @@
   }
 
   function takePhoto() {
-    if (isNative && window.Camera) {
-      return window.Camera.getPhoto({
+    var Camera = plugin("Camera");
+    if (isNative && Camera) {
+      return Camera.getPhoto({
         quality: 70, allowEditing: false, resultType: "base64",
-        source: "camera", correctOrientation: true, saveToGallery: false
+        source: "CAMERA", correctOrientation: true, saveToGallery: false
       });
     }
     // Browser / test fallback: synthetic 1x1 png so logic can be exercised
